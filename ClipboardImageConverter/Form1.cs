@@ -2,19 +2,32 @@
 
 public partial class Form1 : Form
 {
-    private readonly ImageConversionService conversionService = new();
+    private readonly SettingsService settingsService = new();
+    private readonly ImageConversionService conversionService;
     private readonly CancellationTokenSource lifetime = new();
     private ClipboardMonitor? clipboardMonitor;
     private bool processing;
 
     public Form1()
     {
+        conversionService = new ImageConversionService(settingsService);
         InitializeComponent();
     }
 
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
+        try
+        {
+            settingsService.Load();
+            destinationFolderValue.Text = settingsService.DestinationFolder;
+        }
+        catch (Exception ex)
+        {
+            destinationFolderValue.Text = "Pasta indisponível. Escolha outra pasta.";
+            MessageBox.Show(this, $"Não foi possível acessar a pasta de destino. {ex.Message}",
+                "Pasta de destino", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
         try
         {
             clipboardMonitor = new ClipboardMonitor();
@@ -25,6 +38,32 @@ public partial class Form1 : Form
         {
             statusValue.Text = "Erro ao iniciar monitoramento.";
             resultValue.Text = ex.Message;
+        }
+    }
+
+    private void OnChangeDestinationFolder(object? sender, EventArgs e)
+    {
+        using var dialog = new FolderBrowserDialog
+        {
+            Description = "Escolha a pasta para salvar as imagens",
+            UseDescriptionForTitle = true,
+            InitialDirectory = Directory.Exists(destinationFolderValue.Text)
+                ? destinationFolderValue.Text : string.Empty,
+            ShowNewFolderButton = true
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+            return;
+
+        try
+        {
+            settingsService.ChangeDestinationFolder(dialog.SelectedPath);
+            destinationFolderValue.Text = settingsService.DestinationFolder;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                $"Não foi possível alterar ou salvar a pasta de destino. A pasta anterior foi mantida. {ex.Message}",
+                "Pasta de destino", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 

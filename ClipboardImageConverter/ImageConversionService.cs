@@ -2,9 +2,8 @@ using ImageMagick;
 
 namespace ClipboardImageConverter;
 
-internal sealed class ImageConversionService
+internal sealed class ImageConversionService(SettingsService settingsService)
 {
-    private const string DestinationFolder = @"C:\Users\Rogerio\Downloads";
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(60) };
 
     public static bool TryGetHttpUrl(string text, out Uri? url) =>
@@ -35,7 +34,7 @@ internal sealed class ImageConversionService
         return await Task.Run(() => ConvertAndSave(data, url, cancellationToken), cancellationToken);
     }
 
-    private static string? ConvertAndSave(byte[] data, Uri url, CancellationToken cancellationToken)
+    private string? ConvertAndSave(byte[] data, Uri url, CancellationToken cancellationToken)
     {
         using var image = new MagickImage();
         try { image.Read(data); }
@@ -51,12 +50,13 @@ internal sealed class ImageConversionService
         // Converte antes de criar o arquivo para evitar JPG vazio em caso de erro.
         byte[] jpeg = image.ToByteArray();
         cancellationToken.ThrowIfCancellationRequested();
-        Directory.CreateDirectory(DestinationFolder);
+        string destinationFolder = settingsService.DestinationFolder;
+        Directory.CreateDirectory(destinationFolder);
         string name = GetFileName(url);
         for (int suffix = 0; ; suffix++)
         {
             string fileName = suffix == 0 ? $"{name}.jpg" : $"{name} ({suffix}).jpg";
-            string path = Path.Combine(DestinationFolder, fileName);
+            string path = Path.Combine(destinationFolder, fileName);
             FileStream file;
             try
             {
